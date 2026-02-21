@@ -99,11 +99,7 @@ def run_pipeline(
             manifest["steps"]["validate"] = "retry"
             current_step = "script"
         else:
-            manifest["status"] = "failed"
-            manifest["warnings"].append("Script did not pass validation after max retries.")
-            manifest["completed_at_utc"] = datetime.now(UTC).isoformat()
-            update_manifest(run_dir, manifest)
-            write_report(run_dir, "failed", None, manifest["warnings"], validation)
+            current_step = "validate"
             raise RuntimeError("Script validation failed after max retries.")
 
         current_step = "generate"
