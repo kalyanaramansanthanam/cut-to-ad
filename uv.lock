@@ -230,14 +230,16 @@ wheels = [
 [[package]]
 name = "cuttoad"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "awscli" },
     { name = "ddtrace" },
-    { name = "dotenv" },
+    { name = "jsonschema" },
     { name = "loguru" },
     { name = "opentelemetry-distro" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "python-dotenv" },
+    { name = "requests" },
     { name = "strands-agents" },
 ]
 
@@ -245,10 +247,12 @@ dependencies = [
 requires-dist = [
     { name = "awscli", specifier = ">=1.44.44" },
     { name = "ddtrace", specifier = ">=4.4.0" },
-    { name = "dotenv", specifier = ">=0.9.9" },
+    { name = "jsonschema", specifier = ">=4.25.1" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "opentelemetry-distro", specifier = ">=0.60b1" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.30.0" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "requests", specifier = ">=2.32.5" },
     { name = "strands-agents", specifier = ">=1.27.0" },
 ]
 
@@ -291,17 +295,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/6b/5c/330ea8d383eb2ce973df34d1239b3b21e91cd8c865d21ff82902d952f91f/docutils-0.19.tar.gz", hash = "sha256:33995a6753c30b7f577febfc2c50411fec6aac7f7ffeb7c4cfe5991072dcf9e6", size = 2056383, upload-time = "2022-07-05T20:17:31.045Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/93/69/e391bd51bc08ed9141ecd899a0ddb61ab6465309f1eb470905c0c8868081/docutils-0.19-py3-none-any.whl", hash = "sha256:5e1de4d849fee02c63b040a4a3fd567f4ab104defd8a5511fbbc24a8a017efbc", size = 570472, upload-time = "2022-07-05T20:17:26.388Z" },
-]
-
-[[package]]
-name = "dotenv"
-version = "0.9.9"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "python-dotenv" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b2/b7/545d2c10c1fc15e48653c91efde329a790f2eecfbbf2bd16003b5db2bab0/dotenv-0.9.9-py2.py3-none-any.whl", hash = "sha256:29cf74a087b31dafdb5a446b6d7e11cbce8ed2741540e2339c69fbef92c94ce9", size = 1892, upload-time = "2025-02-19T22:15:01.647Z" },
 ]
 
 [[package]]

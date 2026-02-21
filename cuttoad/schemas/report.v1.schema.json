@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "status", "final_video", "warnings", "validation_score"],
+  "properties": {
+    "schema_version": { "const": "v1" },
+    "status": { "type": "string", "enum": ["success", "failed"] },
+    "final_video": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "null" }
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "validation_score": {
+      "anyOf": [
+        { "type": "integer", "minimum": 0, "maximum": 40 },
+        { "type": "null" }
+      ]
+    }
+  }
+}
