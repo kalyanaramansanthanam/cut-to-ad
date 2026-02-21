@@ -31,11 +31,19 @@ def _probe_duration_seconds(video_path: Path, cfg: Config) -> float:
         return 20.0
 
 
-def analyze_video(video_path: Path, run_dir: Path, cfg: Config, dry_run: bool) -> dict[str, Any]:
+def analyze_video(
+    video_path: Path,
+    run_dir: Path,
+    cfg: Config,
+    dry_run: bool,
+    num_scenes: int = 4,
+) -> dict[str, Any]:
     if not video_path.exists():
         raise FileNotFoundError(f"Input video does not exist: {video_path}")
+    if num_scenes < 1:
+        raise ValueError("num_scenes must be >= 1")
     duration = _probe_duration_seconds(video_path, cfg)
-    scene_duration = round(duration / 4.0, 2)
+    scene_duration = round(duration / float(num_scenes), 2)
     analysis = {
         "schema_version": "v1",
         "source_video": str(video_path),
@@ -51,7 +59,7 @@ def analyze_video(video_path: Path, run_dir: Path, cfg: Config, dry_run: bool) -
                 "timestamp_end_sec": round((idx + 1) * scene_duration, 2),
                 "description": f"Scene {idx + 1} from source video style references.",
             }
-            for idx in range(4)
+            for idx in range(num_scenes)
         ],
     }
     validate_artifact("analysis.v1.schema.json", analysis)

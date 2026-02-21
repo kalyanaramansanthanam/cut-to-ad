@@ -15,6 +15,8 @@ def generate_script(
     num_scenes: int = 4,
     feedback: str = "",
 ) -> dict[str, Any]:
+    if num_scenes < 1:
+        raise ValueError("num_scenes must be >= 1")
     scene_duration = round(20.0 / float(num_scenes), 2)
     scenes = []
     for idx in range(num_scenes):

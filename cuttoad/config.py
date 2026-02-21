@@ -22,6 +22,14 @@ class Config:
     aws_region: str
     claude_model_id: str
     gemini_model_id: str
+    dry_run: bool
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def load_config() -> Config:
@@ -39,4 +47,5 @@ def load_config() -> Config:
         aws_region=os.getenv("AWS_REGION", "us-west-2"),
         claude_model_id=os.getenv("CLAUDE_MODEL_ID", "anthropic.claude-sonnet-4-5"),
         gemini_model_id=os.getenv("GEMINI_MODEL_ID", "gemini-2.5-flash"),
+        dry_run=_env_flag("CUTTOAD_DRY_RUN", default=False),
     )

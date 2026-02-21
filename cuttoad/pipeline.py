@@ -63,54 +63,79 @@ def run_pipeline(
     }
     update_manifest(run_dir, manifest)
 
-    analysis = analyze_video(video_path, run_dir, cfg, dry_run=True)
-    manifest["steps"]["analyze"] = "completed"
-    update_manifest(run_dir, manifest)
-
-    feedback = ""
-    script = {}
-    validation = {}
-    for _attempt in range(cfg.max_script_iterations):
-        script = generate_script(
-            analysis=analysis,
-            product=product,
-            audience=audience,
+    validation: dict[str, Any] = {}
+    current_step = "analyze"
+    try:
+        analysis = analyze_video(
+            video_path=video_path,
             run_dir=run_dir,
+            cfg=cfg,
+            dry_run=cfg.dry_run or not bool(cfg.google_api_key),
             num_scenes=max_scenes,
-            feedback=feedback,
         )
-        manifest["steps"]["script"] = "completed"
-        validation = validate_script(script=script, product=product, run_dir=run_dir)
-        if validation["passed"]:
-            manifest["steps"]["validate"] = "completed"
-            break
-        feedback = validation.get("feedback", "")
-        manifest["steps"]["validate"] = "retry"
-    else:
+        manifest["steps"]["analyze"] = "completed"
+        update_manifest(run_dir, manifest)
+
+        feedback = ""
+        script: dict[str, Any] = {}
+        current_step = "script"
+        for _attempt in range(cfg.max_script_iterations):
+            script = generate_script(
+                analysis=analysis,
+                product=product,
+                audience=audience,
+                run_dir=run_dir,
+                num_scenes=max_scenes,
+                feedback=feedback,
+            )
+            manifest["steps"]["script"] = "completed"
+
+            current_step = "validate"
+            validation = validate_script(script=script, product=product, run_dir=run_dir)
+            if validation["passed"]:
+                manifest["steps"]["validate"] = "completed"
+                break
+            feedback = validation.get("feedback", "")
+            manifest["steps"]["validate"] = "retry"
+            current_step = "script"
+        else:
+            manifest["status"] = "failed"
+            manifest["warnings"].append("Script did not pass validation after max retries.")
+            manifest["completed_at_utc"] = datetime.now(UTC).isoformat()
+            update_manifest(run_dir, manifest)
+            write_report(run_dir, "failed", None, manifest["warnings"], validation)
+            raise RuntimeError("Script validation failed after max retries.")
+
+        current_step = "generate"
+        clip_paths = generate_all_clips(script=script, run_dir=run_dir, cfg=cfg)
+        manifest["steps"]["generate"] = "completed"
+        update_manifest(run_dir, manifest)
+
+        current_step = "assemble"
+        normalized_paths = normalize_clips(clip_paths, run_dir=run_dir, cfg=cfg)
+        final_video = assemble_video(normalized_paths, run_dir=run_dir, cfg=cfg)
+        manifest["steps"]["assemble"] = "completed"
+        update_manifest(run_dir, manifest)
+
+        current_step = "report"
+        write_report(
+            run_dir=run_dir,
+            status="success",
+            final_video=str(final_video),
+            warnings=manifest["warnings"],
+            validation=validation,
+        )
+        manifest["steps"]["report"] = "completed"
+        manifest["status"] = "success"
+        manifest["completed_at_utc"] = datetime.now(UTC).isoformat()
+        update_manifest(run_dir, manifest)
+        return final_video
+    except Exception as exc:
+        if current_step in manifest["steps"] and manifest["steps"][current_step] != "completed":
+            manifest["steps"][current_step] = "failed"
         manifest["status"] = "failed"
-        manifest["warnings"].append("Script did not pass validation after max retries.")
+        manifest["warnings"].append(f"{current_step} failed: {exc}")
+        manifest["completed_at_utc"] = datetime.now(UTC).isoformat()
         update_manifest(run_dir, manifest)
         write_report(run_dir, "failed", None, manifest["warnings"], validation)
-        raise RuntimeError("Script validation failed after max retries.")
-
-    clip_paths = generate_all_clips(script=script, run_dir=run_dir, cfg=cfg)
-    manifest["steps"]["generate"] = "completed"
-    update_manifest(run_dir, manifest)
-
-    normalized_paths = normalize_clips(clip_paths, run_dir=run_dir, cfg=cfg)
-    final_video = assemble_video(normalized_paths, run_dir=run_dir, cfg=cfg)
-    manifest["steps"]["assemble"] = "completed"
-    update_manifest(run_dir, manifest)
-
-    write_report(
-        run_dir=run_dir,
-        status="success",
-        final_video=str(final_video),
-        warnings=manifest["warnings"],
-        validation=validation,
-    )
-    manifest["steps"]["report"] = "completed"
-    manifest["status"] = "success"
-    manifest["completed_at_utc"] = datetime.now(UTC).isoformat()
-    update_manifest(run_dir, manifest)
-    return final_video
+        raise

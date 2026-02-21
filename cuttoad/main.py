@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import sys
 from pathlib import Path
 
 from cuttoad.config import Config, load_config
@@ -89,6 +88,12 @@ def validate_run(cfg: Config, run_id: str) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    def positive_int(value: str) -> int:
+        parsed = int(value)
+        if parsed < 1:
+            raise argparse.ArgumentTypeError("must be >= 1")
+        return parsed
+
     parser = argparse.ArgumentParser(prog="cuttoad")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -99,7 +104,12 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--product", required=True, help="Product/brand brief text.")
     run_parser.add_argument("--audience", required=True, help="Audience persona text.")
     run_parser.add_argument("--run-id", default=None, help="Optional explicit run id.")
-    run_parser.add_argument("--max-scenes", type=int, default=None, help="Scene count (default from config).")
+    run_parser.add_argument(
+        "--max-scenes",
+        type=positive_int,
+        default=None,
+        help="Scene count (default from config, must be >= 1).",
+    )
 
     validate_parser = subparsers.add_parser("validate-run", help="Validate artifacts for a run id.")
     validate_parser.add_argument("run_id", help="Run identifier, e.g., run_20260221T... ")
@@ -120,6 +130,8 @@ def main() -> None:
     if args.command == "run":
         video_path = Path(args.video).resolve()
         max_scenes = args.max_scenes or cfg.default_scenes
+        if max_scenes < 1:
+            raise SystemExit("Invalid scene count: must be >= 1")
         final_video = run_pipeline(
             cfg=cfg,
             video_path=video_path,
