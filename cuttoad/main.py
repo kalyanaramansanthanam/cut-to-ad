@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-import argparse
 import os
 from pathlib import Path
+
+import click
+from loguru import logger
 
 from cuttoad.config import Config, load_config
 from cuttoad.io_utils import read_json
@@ -39,10 +41,14 @@ def run_doctor(cfg: Config) -> int:
     has_failures = False
     for name, passed, details in checks:
         marker = "OK" if passed else "WARN"
+        level = "INFO"
         if name in {"ffmpeg", "ffprobe", "output_dir_writable"} and not passed:
             marker = "FAIL"
+            level = "ERROR"
             has_failures = True
-        print(f"[{marker}] {name}: {details}")
+        elif not passed:
+            level = "WARNING"
+        logger.log(level, f"[{marker}] {name}: {details}")
     return 1 if has_failures else 0
 
 
@@ -68,9 +74,9 @@ def validate_run(cfg: Config, run_id: str) -> int:
     ]
     missing = [str(path) for path in required if not path.exists()]
     if missing:
-        print("Missing artifacts:")
+        logger.error("Missing artifacts:")
         for path in missing:
-            print(f"- {path}")
+            logger.error(f"- {path}")
         return 1
 
     validators = [
@@ -83,68 +89,60 @@ def validate_run(cfg: Config, run_id: str) -> int:
     for schema_name, artifact_path in validators:
         payload = read_json(artifact_path)
         validate_artifact(schema_name, payload)
-    print(f"Run artifacts validated: {run_dir}")
+    logger.info(f"Run artifacts validated: {run_dir}")
     return 0
 
 
-def build_parser() -> argparse.ArgumentParser:
-    def positive_int(value: str) -> int:
-        parsed = int(value)
-        if parsed < 1:
-            raise argparse.ArgumentTypeError("must be >= 1")
-        return parsed
-
-    parser = argparse.ArgumentParser(prog="cuttoad")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    subparsers.add_parser("doctor", help="Validate runtime dependencies and environment.")
-
-    run_parser = subparsers.add_parser("run", help="Execute a CutToad pipeline run.")
-    run_parser.add_argument("video", help="Path to input video file.")
-    run_parser.add_argument("--product", required=True, help="Product/brand brief text.")
-    run_parser.add_argument("--audience", required=True, help="Audience persona text.")
-    run_parser.add_argument("--run-id", default=None, help="Optional explicit run id.")
-    run_parser.add_argument(
-        "--max-scenes",
-        type=positive_int,
-        default=None,
-        help="Scene count (default from config, must be >= 1).",
-    )
-
-    validate_parser = subparsers.add_parser("validate-run", help="Validate artifacts for a run id.")
-    validate_parser.add_argument("run_id", help="Run identifier, e.g., run_20260221T... ")
-    return parser
-
-
+@click.group()
 def main() -> None:
-    parser = build_parser()
-    args = parser.parse_args()
+    """CutToad CLI."""
+
+
+@main.command(name="doctor")
+def doctor_cmd() -> None:
+    """Validate runtime dependencies and environment."""
     cfg = load_config()
+    code = run_doctor(cfg)
+    if code != 0:
+        raise click.exceptions.Exit(code)
 
-    if args.command == "doctor":
-        raise SystemExit(run_doctor(cfg))
 
-    if args.command == "validate-run":
-        raise SystemExit(validate_run(cfg, args.run_id))
+@main.command(name="validate-run")
+@click.argument("run_id")
+def validate_run_cmd(run_id: str) -> None:
+    """Validate artifacts for a run id."""
+    cfg = load_config()
+    code = validate_run(cfg, run_id)
+    if code != 0:
+        raise click.exceptions.Exit(code)
 
-    if args.command == "run":
-        video_path = Path(args.video).resolve()
-        max_scenes = args.max_scenes or cfg.default_scenes
-        if max_scenes < 1:
-            raise SystemExit("Invalid scene count: must be >= 1")
-        final_video = run_pipeline(
-            cfg=cfg,
-            video_path=video_path,
-            product=args.product,
-            audience=args.audience,
-            run_id=args.run_id,
-            max_scenes=max_scenes,
-        )
-        print(f"Run complete. Output: {final_video}")
-        raise SystemExit(0)
 
-    parser.print_help()
-    raise SystemExit(2)
+@main.command(name="run")
+@click.argument("video", type=click.Path(exists=True, path_type=Path))
+@click.option("--product", required=True, help="Product/brand brief text.")
+@click.option("--audience", required=True, help="Audience persona text.")
+@click.option("--run-id", default=None, help="Optional explicit run id.")
+@click.option(
+    "--max-scenes",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Scene count (default from config, must be >= 1).",
+)
+def run_cmd(video: Path, product: str, audience: str, run_id: str | None, max_scenes: int | None) -> None:
+    """Execute a CutToad pipeline run."""
+    cfg = load_config()
+    resolved_max_scenes = max_scenes or cfg.default_scenes
+    if resolved_max_scenes < 1:
+        raise click.BadParameter("must be >= 1", param_hint="--max-scenes")
+    final_video = run_pipeline(
+        cfg=cfg,
+        video_path=video.resolve(),
+        product=product,
+        audience=audience,
+        run_id=run_id,
+        max_scenes=resolved_max_scenes,
+    )
+    logger.info(f"Run complete. Output: {final_video}")
 
 
 if __name__ == "__main__":
